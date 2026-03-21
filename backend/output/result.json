@@ -1,1 +1,34 @@
-{}
+{
+"results": [
+{
+"algorithm": "A*",
+"time": 6.5869e-05,
+"cost": 25,
+"routes": [[0,2,3,0],[0,1,0]]
+},
+{
+"algorithm": "BFS",
+"time": 0.000112948,
+"cost": 31,
+"routes": [[0,1,2,0],[0,3,0]]
+},
+{
+"algorithm": "DFS",
+"time": 1.7991e-05,
+"cost": 26,
+"routes": [[0,1,0],[0,3,2,0]]
+},
+{
+"algorithm": "UCS",
+"time": 0.000115473,
+"cost": 25,
+"routes": [[0,1,0],[0,2,3,0]]
+},
+{
+"algorithm": "Greedy",
+"time": 3.0598e-05,
+"cost": 25,
+"routes": [[0,2,3,0],[0,1,0]]
+}
+]
+}

@@ -9,8 +9,3 @@ all:
 
 clean:
 	rm -f $(OUT)
-	
-Run Commands
-cd backend
-make
-./vrp_solver

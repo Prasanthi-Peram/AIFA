@@ -2,6 +2,7 @@ import streamlit as st
 import subprocess
 import json
 import time
+import os
 
 from utils import load_results
 from visualization import animate_routes
@@ -29,14 +30,17 @@ if run:
 
     # (Optional) Save selected algorithms
     try:
-        with open("../backend/data/selected.json", "w") as f:
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "backend", "data")
+        os.makedirs(data_dir, exist_ok=True)
+        with open(os.path.join(data_dir, "selected.json"), "w") as f:
             json.dump({"algorithms": algorithms}, f)
-    except:
-        pass
+    except Exception as e:
+        st.warning(f"Could not save selected algorithms: {e}")
 
     # Run C++ executable
     try:
-        subprocess.run(["../backend/vrp_solver"], check=True)
+        backend_exe = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "vrp_solver"))
+        subprocess.run([backend_exe], check=True, cwd=os.path.dirname(backend_exe))
     except Exception as e:
         st.error(f"Error running backend: {e}")
         st.stop()

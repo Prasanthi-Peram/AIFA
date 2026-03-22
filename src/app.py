@@ -8,6 +8,7 @@ import textwrap
 from utils import load_results
 from visualization import animate_routes
 from charts import show_comparison
+from solver import run_solver
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -16,16 +17,51 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize theme state
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.markdown("## VRP Solver")
-    st.markdown("---")
+    # Title and Theme Toggle inline
+    col1, col2 = st.columns([0.7, 0.3])
+    with col1:
+        st.markdown("## VRP Solver")
+    with col2:
+        st.write("") # Vertical alignment padding
+        icon = "☀️" if st.session_state.dark_mode else "🌙"
+        if st.button(icon, help="Toggle Light/Dark Mode"):
+            st.session_state.dark_mode = not st.session_state.dark_mode
+            st.rerun()
 
-    # Theme toggle
-    st.markdown("### Appearance")
-    dark_mode = st.toggle("Dark Mode", value=False)
-
     st.markdown("---")
+    
+    # Apply custom theme colors based on session state
+    if st.session_state.dark_mode:
+        st.markdown("""
+            <style>
+            [data-testid="stAppViewContainer"] {
+                background-color: #0e1117;
+                color: #fafafa;
+            }
+            [data-testid="stSidebar"] {
+                background-color: #262730;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <style>
+            [data-testid="stAppViewContainer"] {
+                background-color: #ffffff;
+                color: #31333f;
+            }
+            [data-testid="stSidebar"] {
+                background-color: #f0f2f6;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
     st.markdown("### Configuration")
 
     algorithms = st.multiselect(
@@ -46,7 +82,7 @@ with st.sidebar:
     run = st.button("Run Simulation", width='stretch')
 
 # ---------------- THEME COLORS ----------------
-if dark_mode:
+if st.session_state.dark_mode:
     BG = "#0f172a"
     BG_CARD = "#1e293b"
     BG_SECONDARY = "#334155"
@@ -97,7 +133,7 @@ else:
 
 # Build theme dict for passing to charts/viz
 THEME = {
-    "dark_mode": dark_mode,
+    "dark_mode": st.session_state.dark_mode,
     "bg": BG, "bg_card": BG_CARD, "bg_secondary": BG_SECONDARY,
     "text_primary": TEXT_PRIMARY, "text_secondary": TEXT_SECONDARY, "text_muted": TEXT_MUTED,
     "border": BORDER, "shadow": SHADOW,
@@ -439,36 +475,29 @@ if run:
         st.stop()
 
     # Progress bar
-    progress_bar = st.progress(0, text="Initializing C++ backend...")
-
-    # Save selected algorithms
-    try:
-        data_dir = os.path.join(os.path.dirname(__file__), "..", "backend", "data")
-        os.makedirs(data_dir, exist_ok=True)
-        with open(os.path.join(data_dir, "selected.json"), "w") as f:
-            json.dump({"algorithms": algorithms}, f)
-    except Exception as e:
-        st.warning(f"Could not save selected algorithms: {e}")
-
+    progress_bar = st.progress(0, text="Initializing solver...")
     progress_bar.progress(30, text="Running solver...")
-
-    # Run C++ executable
+    
+    # Run Python solver
     try:
-        backend_exe = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "vrp_solver"))
-        subprocess.run([backend_exe], check=True, cwd=os.path.dirname(backend_exe))
+        input_json_path = os.path.join(os.path.dirname(__file__), "..", "data", "input.json")
+        with open(input_json_path, 'r') as f:
+            data = json.load(f)
+        
+        all_results_dict = run_solver(data, algorithms)
+        all_results = all_results_dict["results"]
+        
+        # Write results to output.json for the user
+        output_json_path = os.path.join(os.path.dirname(__file__), "..", "data", "output.json")
+        with open(output_json_path, 'w') as f:
+            json.dump(all_results_dict, f, indent=2)
+            
     except Exception as e:
-        st.error(f"❌ Error running backend: {e}")
+        st.error(f"❌ Error running solver: {e}")
         st.stop()
 
     progress_bar.progress(70, text="Loading results...")
-
-    # Load results
-    all_results = load_results()
-
-    if not all_results:
-        st.error("❌ No results found. Check backend output.")
-        st.stop()
-
+    
     # Store in session state
     st.session_state.all_results = all_results
     st.session_state.run_performed = True
@@ -484,20 +513,24 @@ if st.session_state.run_performed:
     results = [r for r in all_results if r["algorithm"] in algorithms]
 
     if not results:
-        st.warning("⚠️ None of the selected algorithms have results in the current run. Please click 'Run Simulation' again.")
+        st.warning("None of the selected algorithms have results in the current run. Please click 'Run Simulation' again.")
         # We don't stop here, we still show the landing state if no results are selected
         st.session_state.run_performed = False
         st.rerun()
 
-    # Distance matrix
-    dist = [
-        [0, 4, 6, 8],
-        [4, 0, 5, 7],
-        [6, 5, 0, 3],
-        [8, 7, 3, 0]
-    ]
-    # Demands (matching backend: C1=1, C2=3, C3=2)
-    demands = [0, 1, 3, 2]
+    # Load input data for visualization
+    input_json_path = os.path.join(os.path.dirname(__file__), "..", "data", "input.json")
+    try:
+        with open(input_json_path, 'r') as f:
+            input_data = json.load(f)
+        dist = input_data["dist"]
+        # Extract demands from customers list (depot at index 0 has 0 demand)
+        demands = [0] * (len(input_data["customers"]) + 1)
+        for c in input_data["customers"]:
+            demands[c["id"]] = c["demand"]
+    except Exception as e:
+        st.error(f"❌ Error loading input data for visualization: {e}")
+        st.stop()
 
     # ---- SUMMARY METRICS ----
     st.markdown(textwrap.dedent(f"""

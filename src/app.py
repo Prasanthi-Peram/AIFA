@@ -42,10 +42,57 @@ with st.sidebar:
         st.markdown("## VRP Solver")
     with col2:
         st.write("") # Vertical alignment padding
-        icon = "☀️" if st.session_state.dark_mode else "🌙"
-        if st.button(icon, help="Toggle Light/Dark Mode"):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            st.rerun()
+        try:
+            import base64
+            # Load sun icon
+            sun_path = os.path.join(os.path.dirname(__file__), "assets", "sun_icon.png")
+            with open(sun_path, "rb") as f:
+                sun_b64 = base64.b64encode(f.read()).decode()
+            
+            # Load moon icon
+            moon_path = os.path.join(os.path.dirname(__file__), "assets", "moon_icon.png")
+            with open(moon_path, "rb") as f:
+                moon_b64 = base64.b64encode(f.read()).decode()
+            
+            # Select icon based on current theme (show sun in dark mode, moon in light mode)
+            current_b64 = sun_b64 if st.session_state.dark_mode else moon_b64
+            
+            # Clickable image button using custom CSS
+            if st.button(" ", help="Toggle Light/Dark Mode", key="theme_toggle"):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.rerun()
+            
+            st.markdown(f"""
+                <style>
+                /* Target the button in the second column of the sidebar */
+                [data-testid="stSidebar"] [data-testid="column"]:nth-child(2) button {{
+                    background-image: url("data:image/png;base64,{current_b64}") !important;
+                    background-size: 24px 24px !important;
+                    background-repeat: no-repeat !important;
+                    background-position: center !important;
+                    background-color: transparent !important;
+                    border: none !important;
+                    height: 32px !important;
+                    width: 32px !important;
+                    color: transparent !important;
+                    filter: invert(1) !important; /* Make icon white */
+                }}
+                [data-testid="stSidebar"] [data-testid="column"]:nth-child(2) button:hover {{
+                    background-color: rgba(255, 255, 255, 0.1) !important;
+                    border-radius: 4px !important;
+                }}
+                /* Hide the default button text */
+                [data-testid="stSidebar"] [data-testid="column"]:nth-child(2) button div {{
+                    display: none !important;
+                }}
+                </style>
+                """, unsafe_allow_html=True)
+        except Exception:
+            # Fallback to emoji if image fails
+            icon = "☀️" if st.session_state.dark_mode else "🌙"
+            if st.button(icon, help="Toggle Light/Dark Mode"):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.rerun()
 
     st.markdown("---")
     
@@ -60,6 +107,11 @@ with st.sidebar:
             [data-testid="stSidebar"] {
                 background-color: #262730;
             }
+            /* Change multiselect tag colors to grey */
+            span[data-baseweb="tag"] {
+                background-color: #475569 !important;
+                color: white !important;
+            }
             </style>
             """, unsafe_allow_html=True)
     else:
@@ -71,6 +123,11 @@ with st.sidebar:
             }
             [data-testid="stSidebar"] {
                 background-color: #f0f2f6;
+            }
+            /* Change multiselect tag colors to grey */
+            span[data-baseweb="tag"] {
+                background-color: #e2e8f0 !important;
+                color: #475569 !important;
             }
             </style>
             """, unsafe_allow_html=True)
@@ -115,13 +172,13 @@ if st.session_state.dark_mode:
     CHART_GRID = "#334155"
     CHART_TEXT = "#e2e8f0"
     VIZ_FACE = "#1e293b"
-    VIZ_NODE_UNVISITED = "#334155"
-    VIZ_NODE_UNVISITED_EDGE = "#475569"
-    VIZ_LABEL_COLOR = "#f1f5f9"
+    VIZ_NODE_UNVISITED = "#1e293b"
+    VIZ_NODE_UNVISITED_EDGE = "#6366f1"
+    VIZ_LABEL_COLOR = "#ffffff"
     VIZ_FADED_EDGE = "#334155"
-    VIZ_EDGE_LABEL_BG = "#1e293b"
-    VIZ_EDGE_LABEL_FG = "#64748b"
-    VIZ_SPINE = "#475569"
+    VIZ_EDGE_LABEL_BG = "#0f172a"
+    VIZ_EDGE_LABEL_FG = "#94a3b8"
+    VIZ_SPINE = "#334155"
 else:
     BG = "#ffffff"
     BG_CARD = "#ffffff"
@@ -158,6 +215,7 @@ THEME = {
     "viz_node_unvisited_edge": VIZ_NODE_UNVISITED_EDGE, "viz_label_color": VIZ_LABEL_COLOR,
     "viz_faded_edge": VIZ_FADED_EDGE, "viz_edge_label_bg": VIZ_EDGE_LABEL_BG,
     "viz_edge_label_fg": VIZ_EDGE_LABEL_FG, "viz_spine": VIZ_SPINE,
+    "viz_visited_label_color": "#000000" if st.session_state.dark_mode else TEXT_PRIMARY,
 }
 
 # ---------------- CUSTOM CSS (theme-aware) ----------------
@@ -455,6 +513,26 @@ st.markdown(f"""
         font-size: 0.8rem;
         font-style: italic;
     }}
+
+    /* Style tabs to be grey and reasonable size */
+    div[data-baseweb="tab-list"] {{
+        width: 100% !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        gap: 2rem !important;
+    }}
+    button[data-baseweb="tab"] p {{
+        font-size: 20px !important;
+        font-weight: 600 !important;
+    }}
+    button[data-baseweb="tab"] {{
+        color: {TEXT_MUTED} !important;
+        flex: 1 !important;
+        text-align: center !important;
+    }}
+    button[data-baseweb="tab"][aria-selected="true"] {{
+        color: #ef4444 !important; /* Keep selected tab red as in user image */
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -599,66 +677,6 @@ if st.session_state.run_performed:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ---- PER-ALGORITHM RESULTS ----
-    st.markdown(textwrap.dedent(f"""
-<div class="section-header">
-<h3>Algorithm Results</h3>
-</div>
-""").strip(), unsafe_allow_html=True)
-
-    for idx, res in enumerate(results):
-        algo = res["algorithm"]
-        info = ALGO_INFO.get(algo, {"color": "#94a3b8", "desc": ""})
-        is_best = res["cost"] == best_cost
-
-        st.markdown(textwrap.dedent(f"""
-<div class="algo-card" style="border-left: 4px solid {info['color']};">
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-<div>
-<span class="algo-badge" style="background: {info['color']};">
-{algo}
-</span>
-{"<span style='margin-left:0.5rem; background:#dcfce7; color:#15803d; padding:0.25rem 0.6rem; border-radius:100px; font-size:0.75rem; font-weight:600;'>BEST</span>" if is_best else ""}
-</div>
-<span class="desc-text">{info['desc']}</span>
-</div>
-</div>
-""").strip(), unsafe_allow_html=True)
-
-        mcol1, mcol2, mcol3 = st.columns(3)
-
-        with mcol1:
-            st.markdown(textwrap.dedent(f"""
-<div class="metric-card">
-    <div class="accent-bar" style="background: {info['color']};"></div>
-    <div class="label">Total Cost</div>
-    <div class="value">{round(res['cost'], 2)}</div>
-</div>
-"""), unsafe_allow_html=True)
-
-        with mcol2:
-            st.markdown(textwrap.dedent(f"""
-<div class="metric-card">
-    <div class="accent-bar" style="background: {info['color']};"></div>
-    <div class="label">Execution Time</div>
-    <div class="value">{round(res['time'], 6)}s</div>
-</div>
-"""), unsafe_allow_html=True)
-
-        with mcol3:
-            routes_html = ""
-            for i, r in enumerate(res["routes"]):
-                color = ROUTE_COLORS[i % len(ROUTE_COLORS)]
-                route_str = " → ".join(str(n) for n in r)
-                routes_html += f'<span class="route-tag"><span class="route-dot" style="background:{color};"></span>V{i+1}: {route_str}</span> '
-
-            st.markdown(textwrap.dedent(f"""
-<div class="metric-card">
-    <div class="accent-bar" style="background: {info['color']};"></div>
-    <div class="label">Routes</div>
-    <div style="margin-top:0.3rem;">{routes_html}</div>
-</div>
-"""), unsafe_allow_html=True)
 
     # ---- ROUTE ANIMATIONS (TABS) ----
     if len(results) > 0:
@@ -669,22 +687,86 @@ if st.session_state.run_performed:
 </div>
 """).strip(), unsafe_allow_html=True)
 
-        col_sel, col_sld = st.columns([1, 2])
+        algo_names = [res["algorithm"] for res in results]
+        tabs = st.tabs(algo_names)
         
-        with col_sel:
-            algo_names = [res["algorithm"] for res in results]
-            selected_algo = st.selectbox("Select Algorithm", algo_names, key="unified_algo_select")
-            
-        # Find the result for the selected algorithm
-        res = next(r for r in results if r["algorithm"] == selected_algo)
-        max_steps = max(len(r) for r in res["routes"])
-        
-        with col_sld:
-            selected_step = st.slider("Step Through Optimization", 1, max_steps, 1, key="unified_step_slider")
+        for i, tab in enumerate(tabs):
+            with tab:
+                res = results[i]
+                selected_algo = res["algorithm"]
+                max_steps = max(len(r) for r in res["routes"])
+                
+                # Navigation state (unique per tab)
+                step_key = f"step_slider_{selected_algo}"
+                if step_key not in st.session_state:
+                    st.session_state[step_key] = 1
+                
+                # Ensure current_step is within bounds
+                if st.session_state[step_key] > max_steps:
+                    st.session_state[step_key] = max_steps
+                
+                # Visualization Area
+                st.markdown("<br>", unsafe_allow_html=True)
+                animate_routes(dist, res["routes"], selected_algo, demands, ROUTE_COLORS, THEME, step=st.session_state[step_key])
+                
+                # Custom Navigation Bar at the Bottom
+                st.markdown(f"""
+                    <style>
+                    .nav-bar {{
+                        background-color: {BG_SECONDARY};
+                        padding: 0.5rem 1rem;
+                        border-radius: 0 0 8px 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-top: -1rem;
+                        border: 1px solid {BORDER};
+                        border-top: none;
+                    }}
+                    .step-indicator {{
+                        color: {TEXT_MUTED};
+                        font-family: monospace;
+                        font-size: 0.9rem;
+                    }}
+                    /* Increase size of navigation arrow icons */
+                    div[data-testid="stButton"] button:has(div[data-testid="stMarkdownContainer"] p:contains(" < ")),
+                    div[data-testid="stButton"] button:has(div[data-testid="stMarkdownContainer"] p:contains(" > ")) {{
+                        font-size: 1.5rem !important;
+                        font-weight: 700 !important;
+                        height: 40px !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                    }}
+                    </style>
+                """, unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        animate_routes(dist, res["routes"], selected_algo, demands, ROUTE_COLORS, THEME, step=selected_step)
-        st.markdown("<br><br>", unsafe_allow_html=True)
+                # Navigation logic
+                col_nav_left, col_nav_center, col_nav_right = st.columns([1, 1, 1])
+                
+                with col_nav_center:
+                    # Centered Arrows
+                    c_prev, c_next = st.columns(2)
+                    with c_prev:
+                        if st.button(" < ", help="Previous Step", key=f"prev_{selected_algo}", use_container_width=True):
+                            if st.session_state[step_key] > 1:
+                                st.session_state[step_key] -= 1
+                                st.rerun()
+                    with c_next:
+                        if st.button(" > ", help="Next Step", key=f"next_{selected_algo}", use_container_width=True):
+                            if st.session_state[step_key] < max_steps:
+                                st.session_state[step_key] += 1
+                                st.rerun()
+                
+                with col_nav_right:
+                    # Right-aligned Step Indicator
+                    st.markdown(f"""
+                        <div style="text-align: right; padding-top: 0.5rem; color: {TEXT_MUTED}; font-family: monospace;">
+                            {st.session_state[step_key]} / {max_steps}
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("<br><br>", unsafe_allow_html=True)
 
     # ---- COMPARISON CHARTS (only when multiple algorithms) ----
     if len(results) > 1:
@@ -700,35 +782,5 @@ if st.session_state.run_performed:
     st.markdown(textwrap.dedent(f"""
 <div class="footer">
     VRP Solver Dashboard · Built with Streamlit + C++ Backend · AI Search Algorithms
-</div>
-"""), unsafe_allow_html=True)
-
-else:
-    # ---- LANDING STATE ----
-    st.markdown(textwrap.dedent(f"""
-<div style="text-align:center; padding:4rem 2rem;">
-    <h2 style="color:{TEXT_PRIMARY}; font-weight:700; margin-bottom:0.5rem;">Ready to Optimize Routes</h2>
-    <p style="color:{TEXT_MUTED}; font-size:1.2rem; max-width:600px; margin:0 auto;">
-        Select your algorithms from the sidebar and click <strong>Run Simulation</strong> to compare
-        AI search strategies for the Vehicle Routing Problem.
-    </p>
-</div>
-"""), unsafe_allow_html=True)
-
-    # Show algorithm cards
-    st.markdown(textwrap.dedent(f"""
-<div class="section-header">
-    <h3>Available Algorithms</h3>
-</div>
-"""), unsafe_allow_html=True)
-
-    cols = st.columns(3)
-    for i, (name, info) in enumerate(ALGO_INFO.items()):
-        with cols[i % 3]:
-            st.markdown(textwrap.dedent(f"""
-<div class="metric-card" style="text-align:center; padding:1.5rem;">
-    <div class="accent-bar" style="background: {info['color']};"></div>
-    <div style="font-weight:700; color:{TEXT_PRIMARY}; font-size:1.2rem;">{name}</div>
-    <div style="color:{TEXT_MUTED}; font-size:0.95rem; margin-top:0.5rem;">{info['desc']}</div>
 </div>
 """), unsafe_allow_html=True)

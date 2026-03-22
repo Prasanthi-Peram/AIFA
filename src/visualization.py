@@ -106,9 +106,9 @@ def animate_routes(dist, routes, algo_name, demands, route_colors=None, theme=No
     # Edge weights
     edge_labels = nx.get_edge_attributes(G, 'weight')
     nx.draw_networkx_edge_labels(
-        G, pos, edge_labels=edge_labels, font_size=7, font_color=edge_label_fg,
+        G, pos, edge_labels=edge_labels, font_size=9, font_color=edge_label_fg,
         font_family='sans-serif', ax=ax,
-        bbox=dict(boxstyle='round,pad=0.15', facecolor=edge_label_bg, edgecolor='none', alpha=0.8)
+        bbox=dict(boxstyle='round,pad=0.15', facecolor=edge_label_bg, edgecolor='none', alpha=0.9)
     )
 
     # Depot node
@@ -135,8 +135,22 @@ def animate_routes(dist, routes, algo_name, demands, route_colors=None, theme=No
                                node_size=600, edgecolors='#22c55e', linewidths=2.5, ax=ax)
 
     # Node labels
-    nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=7, font_weight='bold',
+    depot_label = {0: node_labels[0]}
+    unvisited_labels = {nd: node_labels[nd] for nd in unvisited}
+    visited_labels = {nd: node_labels[nd] for nd in visited}
+
+    # Draw depot label
+    nx.draw_networkx_labels(G, pos, labels=depot_label, font_size=9, font_weight='bold',
                             font_family='sans-serif', font_color=label_color, ax=ax)
+    # Draw unvisited labels
+    if unvisited_labels:
+        nx.draw_networkx_labels(G, pos, labels=unvisited_labels, font_size=9, font_weight='bold',
+                                font_family='sans-serif', font_color=label_color, ax=ax)
+    # Draw visited labels with potentially different color
+    if visited_labels:
+        visited_label_color = theme.get("viz_visited_label_color", label_color)
+        nx.draw_networkx_labels(G, pos, labels=visited_labels, font_size=9, font_weight='bold',
+                                font_family='sans-serif', font_color=visited_label_color, ax=ax)
 
     # Route edges
     for vidx, route in enumerate(routes):

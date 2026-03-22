@@ -1,44 +1,73 @@
 #include "../include/utils.h"
-#include <limits>
+#include <unordered_map>
 
-State result_state;
-bool found = false;
+// ======================== IDDFS ========================
+// Iterative Deepening Depth-First Search for VRP.
+//
+// Improvements over original:
+//   - No global mutable state — uses references
+//   - Depth = number of customers assigned (not tree depth)
+//   - Proper max depth = N (one per customer)
+//   - State pruning within each depth iteration
+//   - Best-cost tracking to avoid worse solutions
+// =======================================================
 
-// -------------------- DEPTH LIMITED SEARCH --------------------
-void dls(State s, int depth, int max_depth) {
+// ---- Depth-Limited Search (helper) ----
+// depth: number of customer assignments made so far
+// max_depth: maximum assignments allowed in this iteration
+// result: best goal state found (passed by reference)
+// found: whether any goal was found (passed by reference)
+// best: state pruning map (reset per IDDFS iteration)
 
-    if (found) return;
+static void dls(State &s, int depth, int max_depth, State &result, bool &found,
+                unordered_map<size_t, double> &best) {
 
-    // goal condition
-    if (goal(s)) {
-        result_state = s;
-        found = true;
-        return;
+  // Prune: stop if we already found a better solution
+  if (found && s.cost >= result.cost)
+    return;
+
+  // Goal check
+  if (goal(s)) {
+    if (!found || s.cost < result.cost) {
+      result = s;
+      found = true;
     }
+    return;
+  }
 
-    // depth cutoff
-    if (depth >= max_depth) return;
+  // Depth cutoff: stop if we've assigned max_depth customers
+  if (depth >= max_depth)
+    return;
 
-    // expand children
-    for (auto &ns : expand(s)) {
-        dls(ns, depth + 1, max_depth);
-    }
+  // State pruning
+  size_t key = s.state_key();
+  if (best.count(key) && best[key] <= s.cost)
+    return;
+  best[key] = s.cost;
+
+  // Expand children
+  for (auto &ns : expand(s)) {
+    // Count how many new customers were assigned
+    int new_assigned = __builtin_popcount(ns.visited_mask) -
+                       __builtin_popcount(s.visited_mask);
+    dls(ns, depth + new_assigned, max_depth, result, found, best);
+  }
 }
 
-// -------------------- IDDFS --------------------
+// ---- IDDFS Main ----
 State iddfs() {
+  State start = start_state();
+  State result = start;
+  bool found = false;
 
-    State start = start_state();
+  // Iterate depth from 1 to N (each depth = max customer assignments)
+  for (int max_depth = 1; max_depth <= N; max_depth++) {
+    unordered_map<size_t, double> best;
+    dls(start, 0, max_depth, result, found, best);
 
-    // max depth = number of customers (safe upper bound)
-    for (int max_depth = 1; max_depth <= N; max_depth++) {
+    if (found)
+      return result;
+  }
 
-        found = false;
-
-        dls(start, 0, max_depth);
-
-        if (found) return result_state;
-    }
-
-    return start;
+  return start;
 }

@@ -1,32 +1,56 @@
 #include "../include/utils.h"
 #include <queue>
+#include <unordered_map>
 
-struct PQ {
-    State s;
-    double p;
-};
-
-struct cmp {
-    bool operator()(PQ &a, PQ &b) {
-        return a.p > b.p;
-    }
-};
+// ======================== GREEDY SEARCH ========================
+// Greedy best-first search for VRP.
+//
+// Expands states in order of h(s) only (ignores path cost).
+// Fast but not guaranteed optimal.
+//
+// Improvements:
+//   - State pruning: skip if same state seen with lower cost
+//   - Uses MST-based heuristic for better guidance
+// ===============================================================
 
 State greedy() {
-    priority_queue<PQ, vector<PQ>, cmp> pq;
+  // Priority queue entry
+  struct PQEntry {
+    State s;
+    double h;
+    bool operator>(const PQEntry &o) const { return h > o.h; }
+  };
 
-    State start = start_state();
-    pq.push({start, heuristic(start)});
+  priority_queue<PQEntry, vector<PQEntry>, greater<PQEntry>> pq;
+  State start = start_state();
+  pq.push({start, heuristic(start)});
 
-    while (!pq.empty()) {
-        auto cur = pq.top(); pq.pop();
-        State s = cur.s;
+  // State pruning
+  unordered_map<size_t, double> best;
 
-        if (goal(s)) return s;
+  while (!pq.empty()) {
+    auto cur = pq.top();
+    pq.pop();
+    State &s = cur.s;
 
-        for (auto &ns : expand(s))
-            pq.push({ns, heuristic(ns)});
+    // Goal check
+    if (goal(s))
+      return s;
+
+    // State pruning
+    size_t key = s.state_key();
+    if (best.count(key) && best[key] <= s.cost)
+      continue;
+    best[key] = s.cost;
+
+    // Expand successors, prioritize by heuristic
+    for (auto &ns : expand(s)) {
+      size_t nkey = ns.state_key();
+      if (best.count(nkey) && best[nkey] <= ns.cost)
+        continue;
+      pq.push({ns, heuristic(ns)});
     }
+  }
 
-    return start;
+  return start;
 }

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O2
+CXXFLAGS = -std=c++17 -O2 -Wall
 
 SRC = src/*.cpp
 OUT = vrp_solver

@@ -21,6 +21,19 @@ st.set_page_config(
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
+# ---------------- DATA LOADING ----------------
+# Load problem data from input.json at the start to make the UI dynamic
+try:
+    input_json_path = os.path.join(os.path.dirname(__file__), "..", "data", "input.json")
+    with open(input_json_path, 'r') as f:
+        problem_data = json.load(f)
+    num_customers = len(problem_data["customers"])
+    num_vehicles = problem_data["K"]
+    vehicle_capacity = problem_data["capacity"]
+except Exception as e:
+    st.error(f"❌ Error loading problem data: {e}")
+    st.stop()
+
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
     # Title and Theme Toggle inline
@@ -64,6 +77,7 @@ with st.sidebar:
 
     st.markdown("### Configuration")
 
+    # Algorithm selection for comparison
     algorithms = st.multiselect(
         "Select algorithms to compare",
         ["BFS", "DFS", "IDDFS", "UCS", "Greedy", "A*"],
@@ -72,13 +86,15 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Problem Setup")
-    st.markdown("""
-    - **Nodes:** Depot + 3 Customers
-    - **Vehicles:** 2
-    - **Capacity:** 5
+    # Dynamic problem setup based on input.json
+    st.markdown(f"""
+    - **Nodes:** Depot + {num_customers} Customers
+    - **Vehicles:** {num_vehicles}
+    - **Capacity:** {vehicle_capacity}
     """)
 
     st.markdown("---")
+    # Button to trigger the solver
     run = st.button("Run Simulation", width='stretch')
 
 # ---------------- THEME COLORS ----------------

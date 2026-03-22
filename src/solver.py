@@ -1,3 +1,9 @@
+"""
+VRP Solver Module
+Contains the core logic for solving the Vehicle Routing Problem (VRP)
+using various search algorithms.
+"""
+
 import heapq
 import time
 import copy
@@ -6,6 +12,7 @@ from typing import List, Tuple, Dict, Set
 
 @dataclass
 class Customer:
+    """Represents a customer in the VRP."""
     id: int
     demand: int
     ready: int
@@ -14,32 +21,36 @@ class Customer:
 
 @dataclass
 class State:
-    current: List[int]
-    visited_mask: int
-    load: List[int]
-    time: List[int]
-    cost: float
-    routes: List[List[int]]
+    """Represents a search state in the VRP."""
+    current: List[int]      # Current position of each vehicle
+    visited_mask: int       # Bitmask of visited customers
+    load: List[int]         # Current load of each vehicle
+    time: List[int]         # Current time for each vehicle
+    cost: float             # Total cost accumulated so far
+    routes: List[List[int]] # Routes taken by each vehicle
 
     def state_key(self) -> Tuple:
+        """Generates a unique key for state pruning."""
         return (self.visited_mask, tuple(self.current))
 
     def __gt__(self, other):
+        """Comparison for priority queue (A*, UCS, Greedy)."""
         return self.cost > other.cost
 
-# Global-like configuration (will be passed or set per run)
 class Solver:
+    """Main VRP Solver class implementing various search strategies."""
     def __init__(self, K, capacity, dist, customers, top_k=5, hard_time_windows=False):
-        self.K = K
-        self.capacity = capacity
-        self.dist = dist
-        self.customers_list = customers
+        self.K = K                          # Number of vehicles
+        self.capacity = capacity            # Vehicle capacity
+        self.dist = dist                    # Distance matrix
+        self.customers_list = customers     # List of Customer objects
         self.customers_dict = {c.id: c for c in customers}
-        self.N = len(customers)
-        self.TOP_K = top_k
+        self.N = len(customers)             # Total number of customers
+        self.TOP_K = top_k                  # Pruning factor for expansion
         self.HARD_TIME_WINDOWS = hard_time_windows
 
     def start_state(self) -> State:
+        """Initializes the starting state at the depot."""
         return State(
             current=[0] * self.K,
             visited_mask=0,
@@ -50,9 +61,11 @@ class Solver:
         )
 
     def goal(self, s: State) -> bool:
+        """Checks if all customers have been visited."""
         return s.visited_mask == (1 << self.N) - 1
 
     def travel_cost(self, i, j, t) -> float:
+        """Calculates travel cost with peak-hour traffic multipliers."""
         base = self.dist[i][j]
         # Peak hours: 8-10 AM and 5-7 PM (1.5x multiplier)
         if (8 <= t <= 10) or (17 <= t <= 19):
@@ -60,21 +73,26 @@ class Solver:
         return base
 
     def compute(self, curr, c: Customer, time_val) -> Tuple[float, int]:
+        """Computes the cost and arrival time for visiting a customer."""
         travel = self.travel_cost(curr, c.id, time_val)
         arrival = time_val + int(travel)
 
+        # Wait if arriving before ready time
         if arrival < c.ready:
             arrival = c.ready
 
+        # Handle due time violations
         if arrival > c.due:
             if self.HARD_TIME_WINDOWS:
-                return -1.0, -1
+                return -1.0, -1 # Invalid move for hard constraints
+            # Soft constraint: add penalty proportional to lateness and priority
             penalty = (arrival - c.due) * (10.0 * c.priority)
             return travel + penalty, arrival
 
         return travel, arrival
 
     def expand(self, s: State) -> List[State]:
+        """Generates valid successor states from the current state."""
         next_states = []
         unvisited = [i for i in range(self.N) if not (s.visited_mask & (1 << i))]
 
@@ -82,7 +100,7 @@ class Solver:
             return next_states
 
         for v in range(self.K):
-            # Sort unvisited customers by distance from this vehicle's position
+            # Top-K Pruning: Sort unvisited customers by distance
             candidates = sorted(unvisited, key=lambda i: self.dist[s.current[v]][self.customers_list[i].id])
             
             limit = min(len(candidates), self.TOP_K)
@@ -90,13 +108,16 @@ class Solver:
                 i = candidates[idx]
                 c = self.customers_list[i]
 
+                # Capacity constraint check
                 if s.load[v] + c.demand > self.capacity:
                     continue
 
+                # Cost and time calculation
                 cost_add, new_time = self.compute(s.current[v], c, s.time[v])
                 if cost_add < 0:
                     continue
 
+                # Create new state
                 ns = State(
                     current=list(s.current),
                     visited_mask=s.visited_mask | (1 << i),
@@ -111,7 +132,7 @@ class Solver:
                 ns.time[v] = new_time
                 next_states.append(ns)
 
-            # Depot-return option
+            # Depot-return option: Allow vehicle to return to depot to reset load
             if s.current[v] != 0 and len(s.routes[v]) > 1:
                 ns = State(
                     current=list(s.current),
@@ -131,11 +152,12 @@ class Solver:
         return next_states
 
     def heuristic(self, s: State) -> float:
+        """MST-based admissible heuristic for A* and Greedy search."""
         unvisited = [self.customers_list[i].id for i in range(self.N) if not (s.visited_mask & (1 << i))]
         if not unvisited:
             return 0.0
 
-        # Step 1: Min connection cost
+        # Step 1: Min connection cost from any vehicle to unvisited set
         min_connect = float('inf')
         for v in range(self.K):
             for uid in unvisited:
@@ -144,7 +166,7 @@ class Solver:
         if len(unvisited) == 1:
             return min_connect
 
-        # Step 2: Prim's MST
+        # Step 2: Prim's MST over unvisited nodes
         m = len(unvisited)
         min_edge = [float('inf')] * m
         in_mst = [False] * m
@@ -172,6 +194,7 @@ class Solver:
         return min_connect + mst_cost
 
     def astar(self) -> State:
+        """Optimal search using f(s) = g(s) + h(s)."""
         start = self.start_state()
         pq = [(self.heuristic(start), start)]
         best_costs = {}
@@ -194,6 +217,7 @@ class Solver:
         return start
 
     def bfs(self) -> State:
+        """Breadth-First Search (finds shallowest solution)."""
         from collections import deque
         q = deque([self.start_state()])
         best_costs = {}
@@ -213,6 +237,7 @@ class Solver:
         return self.start_state()
 
     def dfs(self) -> State:
+        """Depth-First Search (finds first solution, not necessarily optimal)."""
         stack = [self.start_state()]
         best_costs = {}
         best_sol = self.start_state()
@@ -242,6 +267,7 @@ class Solver:
         return best_sol
 
     def iddfs(self) -> State:
+        """Iterative Deepening Depth-First Search."""
         start = self.start_state()
         self.iddfs_result = start
         self.iddfs_found = False
@@ -273,6 +299,7 @@ class Solver:
         return start
 
     def ucs(self) -> State:
+        """Uniform Cost Search (Dijkstra's algorithm for states)."""
         start = self.start_state()
         pq = [(0.0, start)]
         best_costs = {}
@@ -292,6 +319,7 @@ class Solver:
         return start
 
     def greedy(self) -> State:
+        """Greedy Best-First Search (prioritizes heuristic value)."""
         start = self.start_state()
         pq = [(self.heuristic(start), start)]
         best_costs = {}
@@ -311,6 +339,7 @@ class Solver:
         return start
 
 def run_solver(data, selected_algos):
+    """Entry point for running selected algorithms on problem data."""
     K = data['K']
     capacity = data['capacity']
     dist = data['dist']
@@ -336,7 +365,7 @@ def run_solver(data, selected_algos):
         else:
             continue
             
-        # Final return to depot
+        # Final return to depot for all vehicles
         for v in range(K):
             if res.current[v] != 0:
                 res.cost += dist[res.current[v]][0]

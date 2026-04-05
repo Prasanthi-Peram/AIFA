@@ -35,8 +35,9 @@ The Vehicle Routing Problem (VRP) is a combinatorial optimization and integer pr
 ```text
 AIFA/
 ├── data/
-│   ├── input.json      # Problem definition (customers, distances, capacity)
-│   └── output.json     # Results from the last simulation run
+│   ├── input.json      # Default problem definition
+│   ├── small.json      # Small-scale instance (5 customers)
+│   └── medium.json     # Medium-scale instance (10 customers)
 ├── src/
 │   ├── app.py          # Main Streamlit application entry point
 │   ├── solver.py       # Core VRP solver logic and search algorithms
@@ -77,7 +78,10 @@ streamlit run src/app.py
 Once the server starts, open your browser and navigate to the URL provided (typically `http://localhost:8501`).
 
 ## Usage
-1. **Select Algorithms**: In the sidebar, choose the search algorithms you want to compare.
-2. **Run Simulation**: Click the "Run Simulation" button to execute the solvers.
-3. **Explore Routes**: Use the tabs to view the animated route exploration for each algorithm.
-4. **Compare Results**: Scroll down to see the performance comparison charts.
+1. **Choose a Dataset**: The solver requires a file named `data/input.json` to run. Choose one of the provided datasets and rename it:
+   - For a small problem (5 customers): `cp data/small.json data/input.json`
+   - For a medium problem (10 customers): `cp data/medium.json data/input.json`
+2. **Select Algorithms**: In the sidebar, choose the search algorithms you want to compare.
+3. **Run Simulation**: Click the "Run Simulation" button to execute the solvers.
+4. **Explore Routes**: Use the tabs to view the animated route exploration for each algorithm.
+5. **Compare Results**: Scroll down to see the performance comparison charts.

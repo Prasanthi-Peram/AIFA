@@ -39,7 +39,7 @@ class State:
 
 class Solver:
     """Main VRP Solver class implementing various search strategies."""
-    def __init__(self, K, capacity, dist, customers, top_k=5, hard_time_windows=False):
+    def __init__(self, K, capacity, dist, customers, top_k=5, hard_time_windows=False, max_states=100000):
         self.K = K                          # Number of vehicles
         self.capacity = capacity            # Vehicle capacity
         self.dist = dist                    # Distance matrix
@@ -48,6 +48,7 @@ class Solver:
         self.N = len(customers)             # Total number of customers
         self.TOP_K = top_k                  # Pruning factor for expansion
         self.HARD_TIME_WINDOWS = hard_time_windows
+        self.MAX_STATES = max_states        # Safety limit for search
 
     def start_state(self) -> State:
         """Initializes the starting state at the depot."""
@@ -198,8 +199,11 @@ class Solver:
         start = self.start_state()
         pq = [(self.heuristic(start), start)]
         best_costs = {}
-
+        states_explored = 0
         while pq:
+            states_explored += 1
+            if states_explored > self.MAX_STATES:
+                break
             f, s = heapq.heappop(pq)
             if self.goal(s):
                 return s
@@ -221,7 +225,11 @@ class Solver:
         from collections import deque
         q = deque([self.start_state()])
         best_costs = {}
+        states_explored = 0
         while q:
+            states_explored += 1
+            if states_explored > self.MAX_STATES:
+                break
             s = q.popleft()
             if self.goal(s):
                 return s
@@ -243,8 +251,11 @@ class Solver:
         best_sol = self.start_state()
         best_sol_cost = float('inf')
         found = False
-
+        states_explored = 0
         while stack:
+            states_explored += 1
+            if states_explored > self.MAX_STATES:
+                break
             s = stack.pop()
             if found and s.cost >= best_sol_cost:
                 continue
@@ -303,7 +314,11 @@ class Solver:
         start = self.start_state()
         pq = [(0.0, start)]
         best_costs = {}
+        states_explored = 0
         while pq:
+            states_explored += 1
+            if states_explored > self.MAX_STATES:
+                break
             cost, s = heapq.heappop(pq)
             if self.goal(s):
                 return s
@@ -323,7 +338,11 @@ class Solver:
         start = self.start_state()
         pq = [(self.heuristic(start), start)]
         best_costs = {}
+        states_explored = 0
         while pq:
+            states_explored += 1
+            if states_explored > self.MAX_STATES:
+                break
             h, s = heapq.heappop(pq)
             if self.goal(s):
                 return s

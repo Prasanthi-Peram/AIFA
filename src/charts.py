@@ -138,7 +138,7 @@ def show_comparison(results, theme=None):
             rows_html += '</td>'
             rows_html += f'<td style="padding: 12px 8px; color: {text_color};">{row["cost"]:.1f}</td>'
             rows_html += f'<td style="padding: 12px 8px; color: {text_color};">{row["time"]*1000:.3f}ms</td>'
-            rows_html += f'<td style="padding: 12px 8px; color: {text_muted}; font-size: 0.85rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{routes_str}">{routes_str}</td>'
+            rows_html += f'<td style="padding: 12px 8px; color: {text_muted}; font-size: 0.85rem;" title="{routes_str}">{routes_str}</td>'
             rows_html += '</tr>'
 
         # Minimal table without outer div border to avoid "extra thing" in dark mode
